@@ -12,9 +12,9 @@ app.use(express.json());  // No need for body-parser package anymore
 
 // Route to send an email
 app.post('/send-email', async (req, res) => {
-  const { userName, userEmail, phNumber, purpose, date, callDuration, time, question } = req.body;
+  const { userName, userEmail, phNumber, purpose, date, callDuration, time, question, hostEmail } = req.body;
 
-  if (!userName || !userEmail || !phNumber ||  !purpose || !date || !callDuration || !time || !question) {
+  if (!userName || !userEmail || !phNumber ||  !purpose || !date || !callDuration || !time || !question || !hostEmail) {
     return res.status(400).json({
       message: 'All fields are required: userName, phNumber, email, purpose, date, callDuration, time, and question.',
     });
@@ -35,7 +35,7 @@ app.post('/send-email', async (req, res) => {
   // Email content
   const mailOptions = {
     from: `"Meeting Request" <${process.env.GMAIL_USER}>`, 
-    to: `info@wiserbee.ca`, 
+    to: `${hostEmail}`, 
     subject: 'New Meeting Request',
     html: `
       <h2>New Meeting Request</h2>
