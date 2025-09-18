@@ -8,10 +8,18 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors());
 
+// ✅ Enable CORS for all requests
+app.use(cors({
+  origin: "*", // allow all domains
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// Routes
 app.use("/api/auth", authRoutes);
 
+// DB connection
 connectDB();
 
 // 👇 Only run app.listen if NOT on Vercel
