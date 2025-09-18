@@ -2,7 +2,7 @@ const nodemailer = require("nodemailer");
 const fs = require("fs");
 const path = require("path");
 
-const sendEmail = async (to, subject, templateName, replacements = {}) => {
+const sendEmail = async (to, subject, templateName, replacements = {}, options = {}) => {
   try {
     // 1. Load template file
     const templatePath = path.join(__dirname, "templates", templateName);
@@ -26,10 +26,11 @@ const sendEmail = async (to, subject, templateName, replacements = {}) => {
 
     // 4. Send email
     await transporter.sendMail({
-      from: `"Empello HRM" <${process.env.GMAIL_USER}>`,
+      from: options.from || `"Empello HRM" <${process.env.GMAIL_USER}>`,
       to,
       subject,
       html,
+      attachments: options.attachments || undefined,
     });
 
     console.log("✅ Email sent to:", to);

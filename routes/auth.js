@@ -1,9 +1,7 @@
 const express = require("express");
 const sendEmail = require("../utils/sendEmail");
+const Otp = require("../models/Otp");
 const router = express.Router();
-
-// Temporary in-memory storage (⚠️ only for testing, use MongoDB in real app)
-let otpStore = {};
 
 // 1️⃣ Forgot Password → Generate & Send OTP
 router.post("/forgot-password", async (req, res) => {
@@ -11,14 +9,19 @@ router.post("/forgot-password", async (req, res) => {
     const { email, name } = req.body;
     const otp = Math.floor(100000 + Math.random() * 900000); // 6-digit OTP
 
-    // Save OTP in memory (valid for 10 mins)
-    otpStore[email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
-
     // Send OTP Email
     await sendEmail(email, "Password Reset OTP", "otpTemplate.html", {
       name,
       otp,
     });
+
+    // Save OTP to DB with 10-minute expiry (upsert per email)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await Otp.findOneAndUpdate(
+      { email },
+      { email, otp: String(otp), expiresAt },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
     res.json({ message: "OTP sent to email" });
   } catch (err) {
@@ -32,26 +35,26 @@ router.post("/verify-otp", async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    if (!otpStore[email]) {
-      return res.status(400).json({ message: "No OTP found. Please request again." });
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
     }
 
-    const { otp: storedOtp, expiresAt } = otpStore[email];
+    const record = await Otp.findOne({ email, otp: String(otp) });
 
-    // Check expiry
-    if (Date.now() > expiresAt) {
-      delete otpStore[email];
-      return res.status(400).json({ message: "OTP expired. Please request again." });
-    }
-
-    // Check match
-    if (parseInt(otp) !== storedOtp) {
+    if (!record) {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
-    // ✅ OTP correct → allow reset
-    delete otpStore[email]; // clear used OTP
-    res.json({ message: "OTP verified successfully. You can now reset your password." });
+    if (record.expiresAt < new Date()) {
+      // Clean up expired record
+      await Otp.deleteOne({ _id: record._id });
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    // OTP is valid – delete to prevent reuse
+    await Otp.deleteOne({ _id: record._id });
+
+    return res.json({ message: "OTP verified successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error verifying OTP" });
